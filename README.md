@@ -14,10 +14,11 @@ The following platforms are supported:
 * Ubuntu Server 16.04 LTS
 * Amazon Linux AMI 2014.09 for 32 bit
 * Amazon Linux AMI 2016.09
+* Amazon Linux 2 LTS
 * CentOS 7.x
 
 
-#Prerequisite
+# Prerequisite
 - You need the following AWS permissions:
   - permisison to create, modify, read, list and delete IAM Policies and Roles.
   - Full permission to EC2
@@ -44,8 +45,8 @@ The following platforms are supported:
 	 is 1111111122222233333333333333344444555555:777888880000099999991234567890abcdefghij@repo.centrify.com, set
 	 CENTRIFY_REPO_CREDENIIAL=1111111122222233333333333333344444555555:777888880000099999991234567890abcdefghij
 
-#Configuration parameters
-You can specify the AWS deployment configuration in the `User Data` of the AWS instance.   You ned to download the file 
+# Configuration parameters
+You can specify the AWS deployment configuration in the `User Data` of the AWS instance.   You need to download the file 
 startup-userdata.sh and set up the parameter values in the top part of the file.  The whole file must be copied to 
 the `User Data` of the new EC2 instance and/or Auto Scaling group launch configuration.
 
@@ -78,8 +79,10 @@ The following parameters are for joining to Active Directory using the Centrify 
 | CENTRIFY_REPO_CREDENTIAL | Credential required to access Centrify Repo | no | *a long string* |
 | CENTRIFYDC_JOIN_TO_AD | Whether to join to Active Directory | no | yes |
 | CENTRIFYDC_ZONE_NAME | Name of zone to join to | no | *my_zone* |
-| CENTRIFYDC_HOSTNAME_FORMAT | How to generate host name to use in Active Directory.  Valid values are PRIVATE_IP, INSTANCE_ID. See note below | no | PRIVATE_IP |
-| CENTRIFYDC_KEYTAB_S3_BUCKET | Name of S3 bucket where the login.keytab file for the enroller is stored | no | *my_s3_bucket* |
+| CENTRIFYDC_USE_CUSTOM_KEYTAB_FUNCTION | Whether login.keytab is retrieved using default method or a custom function provided by user. | no | yes |
+| CENTRIFYDC_CUSTOM_KEYTAB_FUNCTION | The name of the custom function used to retrieve login.keytab file. | yes | my_function |
+| custom_keytab_function | Customized function for retrieving the login.keytab file. Function name is specified in CENTRIFYDC_CUSTOM_KEYTAB_FUNCTION. | yes, if using customized function; no for default download. Be sure to save the login.keytab file to /tmp/auto_centrify_deployment/centrifydc; return 0 for success, others for error | wget -O /tmp/auto_centrify_deployment/centrifydc/login.keytab https://your_bucket_name.s3.amazonaws.com/path/to/file <br> r=$? <br> return $r|
+| CENTRIFYDC_KEYTAB_S3_BUCKET | Name of S3 bucket where the login.keytab file for the enroller is stored | no, if using customized function; yes for defualt download | *my_s3_bucket* |
 | CENTRIFYDC_ADDITIONAL_PACKAGES | Name of additional packages to install.  Allowed values are: **centrifydc-openssh**, **centrifydc--ldapproxy** | yes | |
 | CENTRIFYDC_ADJOIN_ADDITIONAL_OPTIONS | Additional options for adjoin command | yes | |
 
@@ -87,7 +90,7 @@ Note that host name is limited to 15 characters.  If the instance ID is longer t
 and there is a remote possibility of hostname conflicts.   We recommend to use PRIVATE-IP address for hostname.
 
 
-#Deployment process
+# Deployment process
   1. If you do not need to install/deploy Centrify Server Suite agent to join to Active Directory,
      you can skip directly to step 3.  
 	 </br>
@@ -99,137 +102,130 @@ and there is a remote possibility of hostname conflicts.   We recommend to use P
      where 
 	 - *your_admin* is the name of a user who is permitted to adopt the account *your_ad_user*
 	 - *your_admin_password* is the password of *your_admin*
-     - *your_ad_user* is the user who joins the instance to Active Directory.
-	 
-	For example:
+     - *your_ad_user* is the user who joins the instance to Active Directory.</br>
+	 For example:</br>
 	 ```
      adkeytab -A -K login.keytab -u admin1  -p admin1_pass join_user1
-	```
-	
-  2. You need to sign in https://console.aws.amazon.com/s3 to create a S3 bucket and then upload 
+	 ```
+	</br>
+  1. If you are using a customized function to get the login.keytab, you can skip to step 3.
+     </br>
+	 You need to sign in https://console.aws.amazon.com/s3 to create a S3 bucket and then upload 
      login.keytab file (created in step 1) to the bucket. You can refer to
      http://docs.aws.amazon.com/AmazonS3/latest/gsg/CreatingABucket.html about how to create a bucket.
 
-  3. Create your Key Pair if you don't have one so that you can log into your EC2 instances. You can refer to</br>
+  1. Create your Key Pair if you don't have one so that you can log into your EC2 instances. You can refer to</br>
       http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair about 
       how to create Key Pair.
 
-  4. Create VPC, subnet and security group for your instances in the new Auto Scaling group.
+  1. Create VPC, subnet and security group for your instances in the new Auto Scaling group.
   
-  5. Create IAM role for lambda function.
+  1. Create IAM role for lambda function.
       - Sign in AWS Management Console and select IAM Service.
-	  - Select Roles, and click on `Create New Role`.
+	  - Select Roles, and click on `Create Role`.
 	    - Enter your role name, click `Next Step`.
-		- Select `AWS Service Roles`, and select `AWS Lambda` in the drop-down list 
+		- Select `AWS Service` as type of trusted entity.
+		- Select `Lambda` as the service that will use this role. Clikc `Next: Permissions`.
 		- Attach the predefined policy AWSLambdaVPCAccessExecutionRole to the role.
-		- Click `Next Step` to review the role. 
+		- Click `Next: Review` to review the role. 
+		- Specify the role name and description.
 		- Click `Create Role`.
 
-  6. In IAM Service, create the following IAM policy and associate it with IAM role above:
+  1. In IAM Service, create the following IAM policy and associate it with IAM role above:
      ```
-	{
-		"Version": "2012-10-17",
-		"Statement": [
-		{
-			"Effect": "Allow", "Action": [
-				"ssm:SendCommand",
-				"ssm:ListCommands",
-				"ssm:ListCommandInvocations"
-			],
-			"Resource": "*"
-		},
-		{
-			"Effect": "Allow",
-			"Resource": "*",
-			"Action": [
-				"ec2:DescribeInstances"
-			]
-		},
-		{
-			"Effect": "Allow",
-			"Resource": "*",
-			"Action": [
-				"autoscaling:CompleteLifecycleAction"
-			]
-		},
-		{
-			"Action": [
+     {
+         "Version": "2012-10-17",
+         "Statement": [
+            {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:SendCommand",
+                "ssm:ListCommands",
+                "ssm:ListCommandInvocations"
+            ],
+            "Resource": "*"
+            },
+            {
+            "Effect": "Allow",
+            "Resource": "*",
+            "Action": [
+                "ec2:DescribeInstances"
+            ]
+            },
+            {
+            "Effect": "Allow",
+            "Resource": "*",
+            "Action": [
+                "autoscaling:CompleteLifecycleAction"
+            ]
+            },
+            {
+            "Action": [
 				"logs:CreateLogGroup",
-				"logs:CreateLogStream",
-				"logs:PutLogEvents"
-			],
-			"Resource": "arn:aws:logs:*:*:*",
-			"Effect": "Allow"
-		}
-		]
-	}
+                "logs:CreateLogStream",
+                "logs:PutLogEvents"
+            ],
+            "Resource": "*",
+            "Effect": "Allow"
+            }
+        ]
+     }
      ```
 
-  7. Create Lambda Function.
+  1. Create Lambda Function.
       - Download centrify-cleanup-lambda-1-0.zip to your local system.
 	  - Select Lambda Service in AWS Console.
-      - Select `Functions`, and then click `Create a Lambda function` button.
-      - In the `Select blueprint` page:
-	    - Choose `python2.7` in `Select runtime` box
-        - Type `hello-world` in `filter` box
-        - Choose `hello-world-python` template.
-      - In the `Configure Triggers` page, click `Next Step`.
-      - In the `Configure function` page, do as follows:
-        - Enter the name of your lambda function in `Name*` box.
-        - Enter description for the Lambda function in `Description` box.
-        - For `Code entry type` selection, select `Upload a .ZIP file`
-		- click `Upload` button to upload the copy of  centrify-cleanup-lambda-1-0.zip that you just downloaded
-        - Add three Environment variables:
-		  - clean_centrifydc:  Specify **yes** if instance is joined to Active Directory; otherwise **no**
-          - clean_centrifycc: Specify **yes** if instance is enrolled to Centrify Identity Platform; otherwise **no** 
-          - s3_bucket_name:  Specify the bucket name that login.keytab is stored in.  Only relevant if instance is joined to Active Directory
-        - For `Handler*` box, keep default `lambda_function.lambda_handler`.
-		- For `Role*` box, keep default `Choose an existing role`
-		  - select the IAM role that you created in step 5.
-		- For `Timeout*` box, set timeout value to 4 min 10 sec.
-		- For `VPC` box, set the VPC and subnet to the one created in Prerequisite section.
-		- Click `Next`
-      - In the Review page, click `Create function` button.
+      - Select `Functions`, and then click `Create function` button.
+	  - Select `Author from scratch` to create the function template.
+      - In the `Author from scratch` panel:
+		- Enter the name of your lambda function in `Name` box.
+	    - Choose `Python 2.7` in `Runtime` box
+		- For the 'Role*' box, keep the default `Choose an existing role` selection.
+		- Choose the IAM role that you created in step 5 in the `Existing role` box.
+		- Click on `Create function`
+	  - Do not add any triggers
+	  - In the `Function code` panel:
+	    - For `Code entry type` selection, select `Upload a .ZIP file`
+		- Make sure the `Runtime` selection is `Python 2.7`.
+		- Keep `lambda_function.lambda_handler` as the value in `Handler` box.
+		- click `Upload` button to upload the copy of centrify-cleanup-lambda-1-0.zip that you just downloaded.
+	  - Add the following two environment variables in the `Environment variables` panel:
+        - clean_centrifydc:  Specify **yes** if instance is joined to Active Directory; otherwise **no**
+        - clean_centrifycc: Specify **yes** if instance is enrolled to Centrify Identity Platform; otherwise **no** 
+	  - In the `Basic settings` panel:
+	    - For the `Timeout` setting, set timeout value to 4 min 10 sec.
+	  - In the `Network` panel, set the VPC and subnet to the ones created in Prerequisite section.
+	  - Click `Save` to create the lambda function.
 
-  8. Create a SNS topic to publish notification of AutoScaling lifecycle hook.
-     - Select SNS Service in AWS Console
+  1. Create a Simple Notification Service (SNS) topic to publish notification of AutoScaling lifecycle hook.
+     - Select Simple Notification Service in AWS Console
 	 - Select `Create topic`
        - Enter topic name and description and continue to create the topic.
      - Select `Topics` to view all SNS topics.
      - Save the ARN value for the newly created topic.	 
 
-  9. Create an IAM Role to allow Autoscaling service to publish the SNS topic.
+  1. Create an IAM Role to allow Autoscaling service to publish the SNS topic.
       - Select IAM Service in AWS Console
-	  - Select Roles, and click on `Create New Role`.
-	    - Enter your role name, click `Next Step`.
-		- Select `AWS Service Roles`, and select `AutoScaling Notification Access` in the drop-down list , click `Next Step`.
-        - In the `Attach Policy` page, don’t select any policy.
-		- Keep click `Next Step` until you have finished the creation process.
+	  - Select Roles, and click on `Create Role`.
+	    - Select `AWS service` as type of trusted entity.
+		- Select `Auto Scaling` as the service that will use this role.
+		- Select `Next: Permissions` to continue
+		- In the `Attached permissions policy`, do not change/add any policy.  Just click on `Next: Review`.
+		- Enter your role name and description.
+		- Click `Create role` to continue.
       - Now an Autoscaling service role without any policy associated is created.
-      - Create an IAM policy as follows and associate it with the IAM Role you just created:
-	```
-	{
-		"Version": "2012-10-17",
-		"Statement": [{ 
-			"Effect": "Allow", 
-			"Resource": "your sns topic arn",
-			"Action": [ "sns:Publish" ] 
-		}]
-	}
-	```
-*your sns topic arn* is the ARN for the topic created in step 8.
 
   1. Subscribe the SNS topic to the Lambda.
        - Select SNS Service in AWS Console
        - Select `Topics`, and select the SNS topic created in step 8. 
-       - In the `Topic details` page, click `Create subscription`.
+       - Click on `Actions` and select `Subscribe to topic` in the pull-down menuexit
        - In the `Create subscription` popup,
           - Select `AWS lambda` for `Protocol`
           - Select your lambda function in the `Endpoint` pull down menu.
           - Leave `default` in the `Version or alias` box.
           - Click `Create subscription`
 
-  1. Grant SNS topic to invoke Lambda function.
+  1. Grant SNS topic to invoke Lambda function.  (may not be needed)
       - Log in to an EC2 instance where awscli is installed and configured.
       - Run the following aws command: </br>
       ```
@@ -242,17 +238,21 @@ and there is a remote possibility of hostname conflicts.   We recommend to use P
 
   1. Create IAM Role for the instances in Auto Scaling group.
       - Select IAM Service in AWS Console
-	  - Select Roles, and click on `Create New Role`.
-	    - Enter your role name, click `Next Step`.
-		- Select `AWS Service Roles`, and select `Amazon EC2` in the drop-down list , click `Next Step`.
-        - In the `Attach Policy` page, select AmazonEC2RoleforSSM and AmazonEC2ReadOnlyAccess.
-		- Keep click `Next Step` until you have finished the creation process.
-
-  1. If your AWS instance needs to join to Active Directory, create the following IAM Policy and attached it 
-      to the IAM role created in step 12 above.  This policy allows the instance to access the S3 bucket to download
-	  the login.keytab file. </br>
-	```
-	{
+	  - Select Roles, and click on `Create Role`.
+	    - Select `AWS service` as type of trusted entity.
+		- Select `EC2` as the service that will use this role.
+		- Select `Next: Permissions` to continue
+		- In the `Attached permissions policy`, select to add `AmazonEC2ReadOnlyAccess` and `AmazonEC2RoleforSSM`.
+		- Click on `Next: Review`.
+		- Enter your role name and description.
+		- Click `Create role` to continue.
+	 
+  1. If your AWS instance does not need to join to Active Directory or if it needs to join to Active Directory but you 
+	  are using a customized function to get login.keytab, skip this step.</br>
+	  Create the following IAM Policy and attached it to the IAM role created in step 12 above.  
+	  This policy allows the instance to access the S3 bucket to download the login.keytab file. </br>
+	  ```
+	  {
 		"Version": "2012-10-17",
 		"Statement": [{ 
 			"Effect": "Allow",
@@ -264,16 +264,17 @@ and there is a remote possibility of hostname conflicts.   We recommend to use P
 				"arn:aws:s3:::your_s3_bucketname/*"
 			]
 		}]
-	}
-	```
-Replace *your_s3_bucketname* by the name of the S3 bucket that you created in step 2.
+	  }
+	  ```
+     </br>Replace *your_s3_bucketname* by the name of the S3 bucket that you created in step 2.
 
   1. Download startup-userdata.sh and create a userdata template.  See the section **Configuration Parameters** for more information.
+     If CENTRIFYDC_USE_CUSTOM_KEYTAB_FUNCTION=yes, be sure to define a valid function with its necessary prerequisites.
   
   1. Create a Launch Configuration for Auto Scaling group. You can refer to 
       http://docs.aws.amazon.com/autoscaling/latest/userguide/GettingStartedTutorial.html#gs-create-lc for more information about creating
 	  a launch configuration.
-       - In `Configure Details` page:
+       - In `Create Launch Configuration` page:
          - choose the IAM role you created in step 12.
 		 - Click `Advanced Details`
            - If you set the configuration parameter CENTRIFYCC_NETWORK_ADDR_TYPE to `PublicIP`, you need to 
@@ -302,7 +303,7 @@ Replace *your_s3_bucketname* by the name of the S3 bucket that you created in st
       - *hook_name* can be any name you want to use as long as it is not same as any other lifecycle hook names.
       - *autoscaling_group_name* is the name of the Auto Scaling group created in step 16.
       - *sns_topic_arn* is the ARN of the SNS topic created in step 8.
-      - *sns_publishing_arn* is the ARN of IAM role created in step 9.
+      - *sns_publishing_role* is the ARN of IAM role created in step 9.
        
 
 # FAQ
