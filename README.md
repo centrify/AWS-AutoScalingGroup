@@ -105,9 +105,9 @@ and there is a remote possibility of hostname conflicts.   We recommend to use P
      - *your_ad_user* is the user who joins the instance to Active Directory.</br>
 	 For example:</br>
 	 ```
-     adkeytab -A -K login.keytab -u admin1  -p admin1_pass join_user1
+       adkeytab -A -K login.keytab -u admin1  -p admin1_pass join_user1
 	 ```
-	</br>
+	 
   1. If you are using a customized function to get the login.keytab, you can skip to step 3.
      </br>
 	 You need to sign in https://console.aws.amazon.com/s3 to create a S3 bucket and then upload 
