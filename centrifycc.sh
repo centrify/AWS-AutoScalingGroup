@@ -228,7 +228,10 @@ function start_deploy()
   
     enable_sshd_password_auth
     r=$? && [ $r -ne 0 ] && return $r
-  
+    
+    enable_sshd_challenge_response_auth
+    r=$? && [ $r -ne 0 ] && return $r
+    
     prepare_for_cenroll
     r=$? && [ $r -ne 0 ] && return $r
   
