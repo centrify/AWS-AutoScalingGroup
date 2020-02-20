@@ -32,7 +32,6 @@
 #
 # This script is tested on AWS AutoScaling using the following EC2 AMIs:
 # - Red Hat Enterprise Linux 7.5                        x86_64
-# - Ubuntu Server 14.04 LTS (HVM), SSD Volume Type      x86_64
 # - Ubuntu Server 16.04 LTS (HVM), SSD Volume Type      x86_64
 # - Ubuntu Server 18.04 LTS (HVM), SSD Volume Type      x86_64
 # - Amazon Linux AMI 2018.03.0 HVM                      x86_64
