@@ -2,7 +2,7 @@
 
 ################################################################################
 #
-# Copyright (c) 2017-2018 Centrify Corporation
+# Copyright (c) 2017-2020 Centrify Corporation
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,13 +26,12 @@
 # - Red Hat Enterprise Linux 6.5                        32bit
 # - Red Hat Enterprise Linux 6.5                        x86_64
 # - Red Hat Enterprise Linux 7.3                        x86_64
+# - Red Hat Enterprise Linux 8.x                        x86_64
 # - Ubuntu Server 16.04 LTS (HVM), SSD Volume Type      x86_64
 # - Ubuntu Server 18.04 LTS (HVM), SSD Volume Type      x86_64
-# - Amazon Linux AMI 2014.09                            32bit
-# - Amazon Linux AMI 2016.09.1.20161221 HVM             x86_64
-# - Amazon Linux AMI 2016.09.1.20161221  PV             x86_64
-# - Amazon Linux 2 LTS
+# - Amazon Linux 2 LTS Candidate AMI (HVM)              x86_64  
 # - CentOS 7.2                                          x86_64
+# - CentOS 8.x                                          x86_64
 #
 
 # Use python to upgrade awscli.
@@ -44,18 +43,22 @@
 # aws s3 cp will succeed.
 function upgrade_awscli()
 {
-    if ! python --version ;then
+    if ! python3 --version ;then
         case "$OS_NAME" in
-        rhel|amzn|centos)
-            yum install python -y
+        rhel|centos)
+            yum install python3 -y
             r=$?
             ;;
+	amzn)
+	    yum install python34 -y
+	    r=$?
+	    ;;
         ubuntu)
-            apt-get -y install python
+            apt-get -y install python3
             r=$?
             ;;
         sles)
-            zypper --non-interactive install python
+            zypper --non-interactive install python3
             r=$?
             ;;
         *)
@@ -68,8 +71,18 @@ function upgrade_awscli()
         fi
     fi
     if ! pip --version ;then
+    	case "$OS_NAME" in 
+        ubuntu)
+             case "$OS_VERSION" in
+             16|16.*) :
+                  ;;
+             *)
+                  apt-get -y install python3-distutils 
+                  ;;  
+             esac
+        esac
         curl --fail -s -O https://bootstrap.pypa.io/get-pip.py
-        python get-pip.py
+        python3 get-pip.py
         r=$r
         if [ $r -ne 0 ];then
             echo "$CENTRIFY_MSG_PREX: pip installation failed"
@@ -104,12 +117,16 @@ function prerequisite()
     if [ "$CENTRIFYDC_JOIN_TO_AD" = "yes" -a "$CENTRIFYDC_USE_CUSTOM_KEYTAB_FUNCTION" != "yes" ];then
         # Ensure that aws cli installed, otherwise we cannot download login.keytab from S3 bucket.
         if ! aws --version ;then
-            if ! python --version ;then
+            if ! python3 --version ;then
                 case "$OS_NAME" in
-                rhel|amzn|centos)
-                    yum install python -y
+                rhel|centos)
+                    yum install python3 -y
                     r=$?
                     ;;
+		amzn)
+		    yum install python34 -y
+		    r=$?
+		    ;;
                 ubuntu)
                     # Default Python source archives are old hence have to update for ubuntu
                     # In Ubuntu 18.04 AWS updates wrong DNS file, we need to point /etc/resolv.conf to correct file temporarily
@@ -123,11 +140,11 @@ function prerequisite()
                     esac
                    
                     apt-get update
-                    apt-get -y install python
+                    apt-get -y install python3
                     r=$?
                     ;;
                 sles)
-                    zypper --non-interactive install python
+                    zypper --non-interactive install python3
                     r=$?
                     ;;
                 *)
@@ -140,8 +157,18 @@ function prerequisite()
                 fi
             fi
             if ! pip --version ;then
+	    	case "$OS_NAME" in 
+                ubuntu)
+                    case "$OS_VERSION" in
+                    16|16.*) :
+                        ;;
+                    *)
+                        apt-get -y install python3-distutils 
+                        ;;  
+                    esac
+                esac
                 curl --fail -s -O https://bootstrap.pypa.io/get-pip.py
-                python get-pip.py
+                python3 get-pip.py
                 r=$r
                 if [ $r -ne 0 ];then
                     echo "$CENTRIFY_MSG_PREX: pip installation failed"
@@ -456,6 +483,37 @@ function clean_files()
     return 0
 }
 
+function install_leave_service ()
+{
+    # install keytab file.
+    cp -f $centrifydc_deploy_dir/login.keytab /etc/centrifydc/login.keytab
+    chmod 400 /etc/centrifydc/login.keytab
+    
+    ENV_FILE="/etc/centrifydc/adjoin.env"
+    
+    # save the adjoin info so it can be used by the centrifydc-adleave service
+    echo "ADJOINER=$join_user" >> $ENV_FILE
+    echo "LOGIN_KEYTAB=/etc/centrifydc/login.keytab" >> $ENV_FILE
+    echo "DOMAIN=$domain_name" >> $ENV_FILE
+    echo "ZONE=$CENTRIFYDC_ZONE_NAME" >> $ENV_FILE
+    echo "ADDITIONAL_OPS=$CENTRIFYDC_ADJOIN_ADDITIONAL_OPTIONS" >> $ENV_FILE
+    echo "CENTRIFYDC_HOSTNAME_FORMAT=$CENTRIFYDC_HOSTNAME_FORMAT" >> $ENV_FILE
+    
+    chmod 644 $ENV_FILE
+    
+    SYSTEMD_PATH="/lib"
+    if [ -d "/usr/lib/systemd/system" ]; then
+        SYSTEMD_PATH="/usr/lib"
+    fi
+    
+    cp -f $centrifydc_deploy_dir/centrifydc-adleave.service $SYSTEMD_PATH/systemd/system/centrifydc-adleave.service
+    
+    chmod 644 $SYSTEMD_PATH/systemd/system/centrifydc-adleave.service
+
+    # need to start the centrifydc-adleave immediately so when stop instance, adleave will be executed.
+    systemctl enable centrifydc-adleave.service --now
+}
+
 function start_deploy()
 {
     prepare_repo
@@ -479,6 +537,10 @@ function start_deploy()
   
       do_adjoin
       r=$? && [ $r -ne 0 ] && return $r
+  
+      install_leave_service
+      r=$? && [ $r -ne 0 ] && return $r
+
     fi
   
     enable_sshd_password_auth

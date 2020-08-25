@@ -10,19 +10,19 @@ need to upload the script as "user data".
 
 The following platforms are supported:
 * Red Hat Enterprise Linux 7.5 or later
+* Red Hat Enterprise Linux 8.x
 * Ubuntu Server 16.04 LTS
 * Ubuntu Server 18.04 LTS
-* Amazon Linux AMI 2018.03.0
 * Amazon Linux 2 LTS
 * CentOS 7.x
+* CentOS 8.x
 
 
 # Prerequisite
 - You need the following AWS permissions:
   - permission to create, modify, read, list and delete IAM Policies and Roles.
   - Full permission to EC2
-  - AWSLambdaFullAccess
-- Create one or more subnets in your VPC for lambda functions to use. These subnets must be private subnets. The routing table of these private subnets must point to a NAT instance or AWS NAT instance that resides in the public subnet of the VPC.
+- Create one or more subnets in your VPC to use. These subnets must be private subnets. The routing table of these private subnets must point to a NAT instance or AWS NAT instance that resides in the public subnet of the VPC.
 - You need an EC2 instance that has AWS CLI commands installed.  Please refer to 
    http://docs.aws.amazon.com/cli/latest/userguide/installing.html#install-with-pip
    for more information about awscli installation.  Make sure that you have configured awscli 
@@ -120,111 +120,6 @@ and there is a remote possibility of hostname conflicts.   We recommend to use P
       how to create Key Pair.
 
   1. Create VPC, subnet and security group for your instances in the new Auto Scaling group.
-  
-  1. Create IAM role for lambda function.
-      - Sign in AWS Management Console and select IAM Service.
-	  - Select Roles, and click on `Create Role`.
-		- Select `AWS Service` as type of trusted entity.
-		- Select `Lambda` as the service that will use this role. Clikc `Next: Permissions`.
-		- Attach the predefined policy AWSLambdaVPCAccessExecutionRole to the role.
-		- Click `Next: Review` to review the role. 
-		- Specify the role name and description.
-		- Click `Create Role`.
-
-  1. In IAM Service, create the following IAM policy and associate it with IAM role above:
-     ```
-     {
-         "Version": "2012-10-17",
-         "Statement": [
-            {
-            "Effect": "Allow",
-            "Action": [
-                "ssm:SendCommand",
-                "ssm:ListCommands",
-                "ssm:ListCommandInvocations"
-            ],
-            "Resource": "*"
-            },
-            {
-            "Effect": "Allow",
-            "Resource": "*",
-            "Action": [
-                "ec2:DescribeInstances"
-            ]
-            },
-            {
-            "Effect": "Allow",
-            "Resource": "*",
-            "Action": [
-                "autoscaling:CompleteLifecycleAction"
-            ]
-            },
-            {
-            "Action": [
-				"logs:CreateLogGroup",
-                "logs:CreateLogStream",
-                "logs:PutLogEvents"
-            ],
-            "Resource": "*",
-            "Effect": "Allow"
-            }
-        ]
-     }
-     ```
-
-  1. Create Lambda Function.
-      - Download centrify-cleanup-lambda-1-0.zip to your local system.
-	  - Select Lambda Service in AWS Console.
-      - Select `Functions`, and then click `Create function` button.
-	  - Select `Author from scratch` to create the function template.
-      - In the `Author from scratch` panel:
-		- Enter the name of your lambda function in `Name` box.
-	    - Choose `Python 2.7` in `Runtime` box
-		- For the 'Role*' box, keep the default `Choose an existing role` selection.
-		- Choose the IAM role that you created in step 5 in the `Existing role` box.
-		- Click on `Create function`
-	  - Do not add any triggers
-	  - In the `Function code` panel:
-	    - For `Code entry type` selection, select `Upload a .ZIP file`
-		- Make sure the `Runtime` selection is `Python 2.7`.
-		- Keep `lambda_function.lambda_handler` as the value in `Handler` box.
-		- click `Upload` button to upload the copy of centrify-cleanup-lambda-1-0.zip that you just downloaded.
-	  - Add the following two environment variables in the `Environment variables` panel:
-        - clean_centrifydc:  Specify **yes** if instance is joined to Active Directory; otherwise **no**
-        - clean_centrifycc: Specify **yes** if instance is enrolled to Centrify Identity Platform; otherwise **no** 
-	  - In the `Basic settings` panel:
-	    - For the `Timeout` setting, set timeout value to 4 min 10 sec.
-	  - In the `Network` panel, set the VPC and subnet to the ones created in Prerequisite section.  Note that you may need to create a security group for the lambda instances.  No incoming internet connection is required for this security group, but it needs to allow outbound connection to internet.
-	  - Click `Save` to create the lambda function.
-
-  1. Create a Simple Notification Service (SNS) topic to publish notification of AutoScaling lifecycle hook.
-     - Select Simple Notification Service in AWS Console
-	 - Select `Create topic`
-       - Enter topic name and description and continue to create the topic.
-     - Select `Topics` to view all SNS topics.
-     - Save the ARN value for the newly created topic.	 
-
-  1. Create an IAM Role to allow Autoscaling service to publish the SNS topic.
-      - Select IAM Service in AWS Console
-	  - Select Roles, and click on `Create Role`.
-	    - Select `AWS service` as type of trusted entity.
-		- Select `Auto Scaling` as the service that will use this role.
-		- Select `Auto Scaling Notification Access` as the use case for this role.
-		- Select `Next: Permissions` to continue
-		- In the `Attached permissions policy`, do not change/add any policy.  Just click on `Next: Review`.
-		- Enter your role name and description.
-		- Click `Create role` to continue.
-      - Now an Autoscaling service role is created.
-
-  1. Subscribe the SNS topic to the Lambda.
-       - Select SNS Service in AWS Console
-       - Select `Topics`, and select the SNS topic created in step 8. 
-       - Click on `Actions` and select `Subscribe to topic` in the pull-down menuexit
-       - In the `Create subscription` popup,
-          - Select `AWS lambda` for `Protocol`
-          - Select your lambda function in the `Endpoint` pull down menu.
-          - Leave `default` in the `Version or alias` box.
-          - Click `Create subscription`
 
   1. Create IAM Role for the instances in Auto Scaling group.
       - Select IAM Service in AWS Console
@@ -276,24 +171,8 @@ and there is a remote possibility of hostname conflicts.   We recommend to use P
       http://docs.aws.amazon.com/autoscaling/latest/userguide/GettingStartedTutorial.html#gs-create-asg for more
 	  information about creating an Auto Scaling group.
       In the `Configure Auto Scaling group details` step, make sure you select the VPC and subnet that you created in step 4.
-      
-  1. Add a lifecycle hook for the autoscaling group so that the lambda function can be invoked when an instance is shutdown in a scale-in operation.
-      - Log in your EC2 instance which you have installed and configured awscli.
-      - Run following command:</br> 
-      ```
-      aws autoscaling put-lifecycle-hook --lifecycle-hook-name hook_name \
-	    --auto-scaling-group-name autoscaling_group_name --notification-target-arn sns_topic_arn \
-		--role-arn sns_publishing_role \
-		--lifecycle-transition autoscaling:EC2_INSTANCE_TERMINATING --heartbeat-timeout 330
-      ```
-      
-	  Notes:
-	  </br>
-	  - You can change '330' to your own time. It should be longer than timeout value of Lambda function.
-      - *hook_name* can be any name you want to use as long as it is not same as any other lifecycle hook names.
-      - *autoscaling_group_name* is the name of the Auto Scaling group created in step 15.
-      - *sns_topic_arn* is the ARN of the SNS topic created in step 8.
-      - *sns_publishing_role* is the ARN of IAM role created in step 9.
+  1. Create notification alert for the above AutoScaling Group. You can refer to
+      https://docs.aws.amazon.com/autoscaling/ec2/userguide/ASGettingNotifications.html for more information about creating notifications.    
        
 
 # FAQ

@@ -2,7 +2,7 @@
 
 ################################################################################
 #
-# Copyright 2017-2018 Centrify Corporation
+# Copyright 2017-2020 Centrify Corporation
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,11 +24,12 @@
 #
 # This script is tested on AWS Autoscaling using the following EC2 AMIs:
 # - Red Hat Enterprise Linux 7.5                        x86_64
+# - Red Hat Enterprise Linux 8                          x86_64
 # - Ubuntu Server 16.04 LTS (HVM)                       x86_64
 # - Ubuntu Server 18.04 LTS (HVM)                       x86_64
-# - Amazon Linux AMI 2018.03.0 (HVM)                    x86_64
 # - Amazon Linux 2 LTS Candidate AMI (HVM)              x86_64
 # - CentOS 7 HVM                                        x86_64
+# - CentOS 8 HVM                                        x86_64
 # - SUSE Linux Enterprise Server 12 SP4 (HVM)           x86_64
 #
 
@@ -216,6 +217,22 @@ function resolve_rpm_name()
     return $r
 }
 
+function install_unenroll_service()
+{
+
+    SYSTEMD_PATH="/lib"
+    if [ -d "/usr/lib/systemd/system" ]; then
+        SYSTEMD_PATH="/usr/lib"
+    fi
+
+    cp -f $centrifycc_deploy_dir/centrifycc-unenroll.service $SYSTEMD_PATH/systemd/system/centrifycc-unenroll.service
+    
+    chmod 644 $SYSTEMD_PATH/systemd/system/centrifycc-unenroll.service
+
+    # need to start the centrifycc-unenroll.service immediately so when stop instance, cunenroll will be executed.
+    systemctl enable centrifycc-unenroll.service --now
+}
+
 function start_deploy()
 { 
     resolve_rpm_name
@@ -234,6 +251,9 @@ function start_deploy()
     r=$? && [ $r -ne 0 ] && return $r
   
     do_cenroll
+    r=$? && [ $r -ne 0 ] && return $r
+
+    install_unenroll_service
     r=$? && [ $r -ne 0 ] && return $r
   
     return 0
