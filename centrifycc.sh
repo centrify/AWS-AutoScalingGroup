@@ -46,9 +46,6 @@ function prerequisite()
 
 function check_config()
 {
-    if [ "$ENABLE_SSM_AGENT" != "yes" -a "$ENABLE_SSM_AGENT" != "no" ];then
-        echo "$CENTRIFY_MSG_PREX: invalid ENABLE_SSM_AGENT: $ENABLE_SSM_AGENT" && return 1
-    fi
   
     if [ "$CENTRIFYCC_TENANT_URL" = "" ];then
         echo "$CENTRIFY_MSG_PREX: must specify CENTRIFYCC_TENANT_URL!" 
@@ -204,7 +201,7 @@ function resolve_rpm_name()
         CENTRIFYCC_RPM_NAME="CentrifyCC-rhel6.x86_64.rpm"
         ;;
     ubuntu)
-        CENTRIFYCC_RPM_NAME="centrifycc-deb8-x86_64.deb"
+        CENTRIFYCC_RPM_NAME="centrifycc-deb9-x86_64.deb"
         ;;
     sles)
         CENTRIFYCC_RPM_NAME="CentrifyCC-suse12.x86_64.rpm"
@@ -272,7 +269,7 @@ detect_os
 r=$? 
 [ $r -ne 0 ] && echo "$CENTRIFY_MSG_PREX: detect OS failed  [exit code=$r]" && exit $r
 
-check_supported_os centrifycc support_ssm
+check_supported_os centrifycc
 r=$? 
 [ $r -ne 0 ] && echo "$CENTRIFY_MSG_PREX: current OS is not supported [exit code=$r]" && exit $r
 

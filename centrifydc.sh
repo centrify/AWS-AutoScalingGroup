@@ -228,20 +228,11 @@ function prerequisite()
         [ $r -ne 0 ] && echo "$CENTRIFY_MSG_PREX: awscli configure failed" && return $r
     fi
   
-    if [ "$ENABLE_SSM_AGENT" = "yes" ];then
-        install_aws_ssm_agent
-        r=$?
-        [ $r -ne 0 ] && return $r
-    fi
-  
     return 0
 }
 
 function check_config()
 {
-    if [ "$ENABLE_SSM_AGENT" != "yes" -a "$ENABLE_SSM_AGENT" != "no" ];then
-        echo "$CENTRIFY_MSG_PREX: invalid ENABLE_SSM_AGENT: $ENABLE_SSM_AGENT" && return 1
-    fi
   
     if [ "$CENTRIFYDC_JOIN_TO_AD" != "no" -a "$CENTRIFYDC_JOIN_TO_AD" != "yes" ];then
         echo "$CENTRIFY_MSG_PREX: invalid CENTRIFYDC_JOIN_TO_AD: $CENTRIFYDC_JOIN_TO_AD" && return 1
@@ -567,7 +558,7 @@ detect_os
 r=$? 
 [ $r -ne 0 ] && echo "$CENTRIFY_MSG_PREX: detect OS failed [exit code=$r]" && exit $r
 
-check_supported_os centrifydc support_ssm
+check_supported_os centrifydc
 r=$? 
 [ $r -ne 0 ] && echo "$CENTRIFY_MSG_PREX: current OS is not supported [exit code=$r]" && exit $r
 

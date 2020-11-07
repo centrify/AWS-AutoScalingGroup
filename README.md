@@ -205,13 +205,6 @@ Q. Can I specify my computer name in Active Directory while adjoin?
 Yes. You can set CENTRIFYDC_HOSTNAME_FORMAT. Currently we only support using 
 aws instance id(set to INSTANCE_ID) or private IP(set to PRIVATE_IP) as your computer name.
 
-Q. Can I use the startup-userdata.sh in my standalone EC2 instances not mananged by AutoScaling Group?
-
-Yes. You do not need AWSLambdaFullAccess permission.  Also, the differences in deployment process are:
-- You can skip steps 5 through 12, and also skip steps 15 through 17.
-- If the instance needs to join to Active Directory, you still need to create an IAM role that can access the S3 bucket using the IAM policy created in step 13.
-- There is no lambda function support.  You need to manually run cunenroll and/or adleave to clean up before you terminate the instance.
-
 Q. Why don't I get Public IP while enroll EC2 for Linux to Centrify identity?
 
 You shall make sure that your AutoScaling has enabled public IP assignment and
@@ -224,12 +217,6 @@ Q. Can I view any log output after running startup-userdata.sh?
 
 Yes. You can find the log in /tmp/auto_centrify_deployment/centrifycc/deploy.log
 for CentrifyCC and in /tmp/auto_centrify_deployment/centrifydc/deploy.log for CentrifyDC.
-
-Q. Why don't we support SuSE currently?
-
-We use AWS Run Command in AWS Lambda function to automatically run 'adleave'
-or 'cunenroll' to release server's resource while autoscaling in. But AWS
-doesn't support Run Command on SuSE currently.
 
 Q. What does error "x509: certificate signed by unknown authority" mean?
 
@@ -252,6 +239,8 @@ interactively, you cannot include commands that require user feedback (such as
 yum update without the -y flag)." [1]
 
 "User data is limited to 16 KB." [2]
+
+Q. How to use putty (instead of web-based ssh client from admin portal) to connect the enrolled machine? Change the security group for the connector instance to allow for this. Keep the VPC same for all the security groups. Allow connector's security group to listen to port 22, of enrolled machines(Change Inbound rule from AWS Web Console). From connector machine, now ssh will be enabled via putty.
 
 References:
 [1] Running Commands on Your Linux Instance at Launch

@@ -150,17 +150,6 @@ export CENTRIFYDC_ADDITIONAL_PACKAGES=''
 # /usr/sbin/adjoin $domain_name -z $ZONE_NAME --name `hostname`
 export CENTRIFYDC_ADJOIN_ADDITIONAL_OPTIONS=''
 
-# This specifies whether the EC2 instance support ssm.
-# Allowed value are yes|no (default yes).
-# It is for AutoScaling Group.
-# If set the parameter to yes, then SSM agent will be installed 
-# and the lambda function can use 'Run Command' feature to 
-# adleave/cunenroll while the EC2 instnace is scaled in by autoscaling group.
-# Otherwise, lambda function can't call adleave/cunenroll to remove computer object
-# while the EC2 instance is scaled in by autoscaling group.
-export ENABLE_SSM_AGENT=yes
-
-
 # This specifies whether the script of centrifydc.sh/centrifycc.sh will enable 'set -x'.
 # Allowed values are yes|no (default no).
 export DEBUG_SCRIPT=no
