@@ -238,8 +238,8 @@ function check_config()
         echo "$CENTRIFY_MSG_PREX: invalid CENTRIFYDC_JOIN_TO_AD: $CENTRIFYDC_JOIN_TO_AD" && return 1
     fi
   
-    if [ "$CENTRIFY_REPO_CREDENTIAL" = "" ];then
-        echo "$CENTRIFY_MSG_PREX: invalid CENTRIFY_REPO_CREDENTIAL" && return 1
+    if [ "$CENTRIFYDC_REDHAT_TOKEN" = "" -a "$CENTRIFYDC_SUSE_TOKEN" = "" -a "$CENTRIFYDC_UBUNTU_TOKEN" = "" ];then
+        echo "$CENTRIFY_MSG_PREX: Must set OS based repo key" && return 1
     fi
     
     if [ "$CENTRIFYDC_JOIN_TO_AD" = "yes" ];then
